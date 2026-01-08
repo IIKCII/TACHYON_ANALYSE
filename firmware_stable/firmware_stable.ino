@@ -62,6 +62,12 @@ static uint32_t perf_avg_cycles = 0;
 static uint32_t perf_frame_count = 0;
 #endif
 
+// ===== LOOP FREQUENZ MESSUNG =====
+// Misst wie schnell die loop() Funktion läuft
+static uint32_t loop_counter = 0;           // Zählt loop() Durchläufe
+static uint32_t loop_last_time = 0;         // Letzter Zeitpunkt der Messung (ms)
+static uint32_t loop_frequency = 0;         // Gemessene Frequenz (Hz)
+
 // ===== DS4 REPORT COUNTER (für BF6 Kompatibilität!) =====
 // Echter DS4 hat einen 6-bit Counter in Byte 7 (Bits 2-7)
 // BF6 prüft diesen Counter um "echte" Controller zu erkennen!
@@ -1477,6 +1483,24 @@ void updateController() {
 }
 
 void loop() {
+    // ===== LOOP FREQUENZ MESSUNG =====
+    // Zähle loop() Durchläufe und berechne Frequenz jede Sekunde
+    loop_counter++;
+    uint32_t current_time = millis();
+
+    if (current_time - loop_last_time >= 1000) {  // Alle 1000ms (1 Sekunde)
+        loop_frequency = loop_counter;  // Anzahl Durchläufe = Frequenz in Hz
+
+        // Speichere in reserved[5-7] für Debugging (kann ausgelesen werden)
+        g_report.reserved[5] = (loop_frequency >> 16) & 0xFF;  // High byte
+        g_report.reserved[6] = (loop_frequency >> 8) & 0xFF;   // Middle byte
+        g_report.reserved[7] = loop_frequency & 0xFF;          // Low byte
+
+        // Reset für nächste Sekunde
+        loop_counter = 0;
+        loop_last_time = current_time;
+    }
+
     // OPTIMIERUNG: Performance-Stats-Update aus ISR ausgelagert!
     // Reduziert ISR-Zeit deutlich (non-kritische Operationen nicht in ISR!)
 #if CONFIG_ENABLE_PERF_MONITORING
